@@ -14,24 +14,27 @@ type (
 	}
 
 	world struct {
-		upperRight                 *coordinate
-		fallenPositions            []*coordinate
-		finalPositionAndDirections []string
+		upperRight                 *coordinate   // world boundary
+		fallenPositions            []*coordinate // store positions of robots that go oob
+		finalPositionAndDirections []string      // store final position/direction of robots as strings
 	}
 
 	robot struct {
 		position  *coordinate
 		direction *direction
-		isFallen  bool
+		isFallen  bool // robot has "fallen" oob, final position inclues "LOST", and it stops moving
 	}
 
 	direction struct {
-		ring *ring.Ring
+		ring *ring.Ring // store compass direction as ring
 	}
 )
 
 var compassPoints = []string{"N", "E", "S", "W"}
 
+// RunRobots takes the complete instructions for the world and robot
+// movement, and returns a slice of strings for the robot final
+// positions.
 func RunRobots(instructions string) ([]string, error) {
 	lines := strings.FieldsFunc(
 		string(instructions), func(c rune) bool { return c == '\n' || c == '\r' },
@@ -121,6 +124,7 @@ func parseCoords(xStr, yStr string) (*coordinate, error) {
 	return &coordinate{x: x, y: y}, nil
 }
 
+// initialise a collections/ring for use as the compass points
 func newDirection(start string) (*direction, error) {
 	index, err := indexOfCompass(start)
 	if err != nil {
@@ -142,6 +146,8 @@ func newRobot(pos *coordinate, dir *direction, world *world) (*robot, error) {
 	return &robot{position: pos, direction: dir}, nil
 }
 
+// return the index of the provided compass point in the compassPoints
+// slice
 func indexOfCompass(c string) (int, error) {
 	for k, v := range compassPoints {
 		if c == v {
@@ -171,6 +177,9 @@ func (w *world) addFinalPositionAndDirection(r *robot) {
 	w.finalPositionAndDirections = append(w.finalPositionAndDirections, str)
 }
 
+// Update the provided robot's direction/position according to a single
+// command, (currently either L, R or F).
+// Update the world if the robot goes out of bounds (falls).
 func (w *world) moveRobot(robot *robot, instr string) error {
 	prevPos := &coordinate{x: robot.position.x, y: robot.position.y}
 	switch instr {
@@ -189,9 +198,6 @@ func (w *world) moveRobot(robot *robot, instr string) error {
 		case "W":
 			robot.position.x -= 1
 		}
-
-	// case "other command types":
-	//
 	default:
 		return fmt.Errorf("illegal command %s", instr)
 	}
@@ -203,6 +209,8 @@ func (w *world) moveRobot(robot *robot, instr string) error {
 		isFallenPos := false
 		for _, c := range w.fallenPositions {
 			if prevPos.x == c.x && prevPos.y == c.y {
+				// if this is a position where other robots have fallen,
+				// don't set this robot isFallen.
 				isFallenPos = true
 				break
 			}
